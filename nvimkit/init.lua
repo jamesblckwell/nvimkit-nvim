@@ -1,26 +1,5 @@
 local M = {}
 
-M._jsFiletypes = {
-    "+page.svelte",
-    "+page.js",
-    "+page.server.js",
-    "+server.js",
-    "+layout.svelte",
-    "+layout.js",
-    "+layout.server.js",
-    "+error.svelte",
-}
-
-M._tsFiletypes = {
-    "+page.svelte",
-    "+page.ts",
-    "+page.server.ts",
-    "+server.ts",
-    "+layout.svelte",
-    "+layout.ts",
-    "+layout.server.ts",
-    "+error.svelte",
-}
 
 M._default_config = {
     svelte_route_dirname = "/src/routes",
@@ -37,22 +16,6 @@ local check_setup = function()
     return M._config ~= nil
 end
 
--- checks if a directory exists
-local check_dir_exists = function(path)
-    return vim.fn.isdirectory(path) ~= 0
-end
-
--- checks if a file exists
-local file_exists = function(path)
-    return vim.fn.filereadable(path) ~= 0
-end
-
--- merges two tables together, see: https://stackoverflow.com/a/1283399
-local merge_tables = function(t1, t2)
-    for k, v in pairs(t2) do t1[k] = v end
-    return t1
-end
-
 -- Generate route options for the user to select from
 local generate_route_options = function()
     local options = { "Select the desired filetype: (or 0 to just create the route directory)" }
@@ -64,13 +27,13 @@ end
 
 
 local create_file = function(path, route_file)
-    if check_dir_exists(path) == false then
+    if Utils.check_dir_exists(path) == false then
         vim.fn.mkdir(path, "p")
     end
 
     local route_filepath = path .. "/" .. route_file
 
-    if file_exists(route_filepath) == true then
+    if Utils.file_exists(route_filepath) == true then
         print("\nError: File already exists: ", route_filepath)
         return
     end
@@ -110,25 +73,18 @@ local create_file = function(path, route_file)
     end
 end
 
--- Detect if the project is a typescript project
-M._detectTS = function()
-    local cwd = vim.fn.getcwd();
-    local tsconfig = cwd .. "/tsconfig.json";
-    return file_exists(tsconfig);
-end
-
 M.create_route = function(filename, route)
     local options = generate_route_options()
 
     if check_setup() == false then
-        print("Error: Setup not called")
+        error("Error: Setup not called", 0)
         return
     end
 
     local cwd = vim.fn.getcwd()
     local svelte_root = cwd .. M._config["svelte_route_dirname"]
 
-    if check_dir_exists(svelte_root) == false then
+    if Utils.check_dir_exists(svelte_root) == false then
         error("Error: Svelte root directory not found: " .. svelte_root, 0)
         return
     end
@@ -160,34 +116,45 @@ M.setup = function(opts)
         opts = M._default_config
     end
 
+    M.load_extension("extensions.svelte")
+
     M._templates = require("nvimkit.templates")
+    M._utils = require("nvimkit.utils")
 
-    M._default_config["is_TS_project"] = M._detectTS();
+    -- M._default_config["is_TS_project"] = M._detectTS();
 
-    M._config = merge_tables(M._default_config, opts)
-
-    if M._config["is_TS_project"] == true then
-        M._config["route_filetypes"] = M._tsFiletypes
-    else
-        M._config["route_filetypes"] = M._jsFiletypes
-    end
-
-    vim.api.nvim_create_user_command(
-        "NvimkitCreateRoute",
-        function(args)
-            M.create_route(args["fargs"][1], args["fargs"][2])
-        end,
-        {
-            nargs = "*",
-            complete = function(ArgLead, CmdLine, CursorPos)
-                -- only complete for the first argument
-                if CursorPos == 19 then
-                    return M._config["route_filetypes"]
-                end
-            end,
-            desc = "NvimkitCreateRoute <filetype> <route> - Create a new route file in the svelte routes directory"
-        }
-    )
+    -- M._config = Utils.merge_tables(M._default_config, opts)
+    --
+    -- if M._config["is_TS_project"] == true then
+    --     M._config["route_filetypes"] = M._tsFiletypes
+    -- else
+    --     M._config["route_filetypes"] = M._jsFiletypes
+    -- end
+    --
+    -- vim.api.nvim_create_user_command(
+    --     "NvimkitCreateRoute",
+    --     function(args)
+    --         M.create_route(args["fargs"][1], args["fargs"][2])
+    --     end,
+    --     {
+    --         nargs = "*",
+    --         complete = function(ArgLead, CmdLine, CursorPos)
+    --             -- only complete for the first argument
+    --             if CursorPos == 19 then
+    --                 return M._config["route_filetypes"]
+    --             end
+    --         end,
+    --         desc = "NvimkitCreateRoute <filetype> <route> - Create a new route file in the svelte routes directory"
+    --     }
+    -- )
 end
+
+M.load_extension = function(extension)
+    local ext = require("nvimkit." .. extension)
+    ext.setup()
+end
+
+M.setup()
+-- M.create_route("+page.svelte", "route")
 
 return M
